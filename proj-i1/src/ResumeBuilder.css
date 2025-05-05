@@ -1,0 +1,80 @@
+.resume-builder-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 20px;
+  background-color: #f0f2f5;
+}
+
+.template-selector {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.template-selector h2 {
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.template-selector select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+.resume-builder-content {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+}
+
+.input-section {
+  flex: 1;
+  max-width: 600px;
+  overflow-y: auto;
+  height: calc(100vh - 100px);
+  position: sticky;
+  top: 20px;
+}
+
+.preview-section {
+  flex: 2;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow-y: auto;
+  height: calc(100vh - 100px);
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .resume-builder-content {
+    flex-direction: column;
+  }
+
+  .input-section {
+    max-width: 100%;
+    height: auto;
+    position: static;
+  }
+
+  .preview-section {
+    height: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .resume-builder-container {
+    padding: 10px;
+  }
+
+  .template-selector {
+    padding: 10px;
+  }
+}
+

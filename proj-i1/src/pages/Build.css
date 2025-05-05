@@ -1,0 +1,152 @@
+/* src/styles/Build.css */
+
+/* Base Styles for Build Page */
+.build-page {
+  padding: 60px 40px;
+  background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%);
+  min-height: 100vh;
+  position: relative;
+  font-family: 'Poppins', sans-serif;
+}
+
+.build-header {
+  text-align: center;
+  margin-bottom: 50px;
+}
+
+.build-header h1 {
+  font-size: 40px;
+  font-weight: 700;
+  background: linear-gradient(90deg, #007bff, #00c4cc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: fadeInDown 1s ease-in;
+  margin-bottom: 20px;
+}
+
+.template-controls {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.template-search {
+  padding: 12px 20px;
+  border: 2px solid #e0e6ed;
+  border-radius: 30px;
+  font-size: 16px;
+  width: 300px;
+  transition: all 0.3s ease;
+}
+
+.template-search:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.2);
+  outline: none;
+}
+
+.template-filter {
+  padding: 12px 20px;
+  border: 2px solid #e0e6ed;
+  border-radius: 30px;
+  font-size: 16px;
+  background-color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.template-filter:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.2);
+  outline: none;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 30px;
+  max-width: 1300px;
+  margin: 0 auto;
+}
+
+.template-card {
+  background: #ffffff;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+}
+
+.template-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 12px 30px rgba(0, 123, 255, 0.2);
+}
+
+.template-preview {
+  padding: 25px;
+  text-align: center;
+  background: #ffffff;
+}
+
+.template-image {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  transition: transform 0.3s ease;
+}
+
+.template-card:hover .template-image {
+  transform: scale(1.05);
+}
+
+.template-preview h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin: 15px 0 10px;
+}
+
+.edit-btn {
+  background: linear-gradient(90deg, #28a745, #34c759);
+  color: #ffffff;
+  padding: 12px 25px;
+  border: none;
+  border-radius: 25px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 10px rgba(40, 167, 69, 0.2);
+}
+
+.edit-btn:hover {
+  background: linear-gradient(90deg, #218838, #2db74d);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 15px rgba(40, 167, 69, 0.3);
+}
+
+/* Animations */
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .build-page { padding: 50px 30px; }
+}
+
+@media (max-width: 768px) {
+  .build-page { padding: 40px 20px; }
+  .template-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .build-page h1 { font-size: 32px; }
+  .build-page { padding: 30px 15px; }
+  .template-preview { padding: 20px; }
+  .edit-btn { padding: 10px 20px; font-size: 13px; }
+}
