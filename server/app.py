@@ -693,4 +693,4 @@ def analyze_resume():
         return jsonify({'error': f'Failed to analyze resume: {str(e)}'}), 500
         
 if __name__ == '__main__':
-    app.run(debug=True, port=5001) 
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5001)))
