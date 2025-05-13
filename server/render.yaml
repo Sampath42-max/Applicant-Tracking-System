@@ -1,0 +1,5 @@
+services:
+  - type: web
+    name: resume-analyzer
+    env: docker
+    plan: free
