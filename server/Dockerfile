@@ -29,4 +29,4 @@ EXPOSE 10000
 ENV PYTHONUNBUFFERED=1
 
 # Start the app
-CMD ["gunicorn", "server.app:app", "--bind", "0.0.0.0:10000"]
+CMD ["gunicorn", "server.app:app", "--bind", "0.0.0.0:5001"]
