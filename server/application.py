@@ -107,7 +107,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:3000",
         "http://192.168.56.1:3000",
-        "https://applicant-tracking-system-eight.vercel.app"
+        "https://resume-nexa.vercel.app"
     ],
     allow_origin_regex=(
         None if IS_PRODUCTION
