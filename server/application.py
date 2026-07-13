@@ -425,9 +425,9 @@ def create_session_response(user, message):
         key=SESSION_COOKIE_NAME,
         value=token,
         httponly=True,
-        secure=IS_PRODUCTION,
+        secure=True,
         max_age=SESSION_MAX_AGE_SECONDS,
-        samesite="lax",
+        samesite="none",
     )
     return response
 
@@ -1712,7 +1712,7 @@ async def check_resume(request: Request, resume: UploadFile = File(None), target
 def logout():
     logger.info("Processing /api/logout request")
     response = JSONResponse({"message": "Logged out successfully"})
-    response.delete_cookie(SESSION_COOKIE_NAME)
+    response.delete_cookie(SESSION_COOKIE_NAME, secure=True, samesite="none")
     return response
 
 # Error handlers
