@@ -1,0 +1,14 @@
+beautifulsoup4==4.13.3
+fastapi==0.115.11
+google-generativeai==0.8.6
+itsdangerous==2.2.0
+pymongo[srv]>=4.6.0
+pydantic==2.10.6
+pydantic-settings>=2.0.0
+python-dotenv==1.0.1
+python-multipart==0.0.20
+PyPDF2==3.0.1
+requests==2.32.3
+starlette==0.46.1
+uvicorn==0.34.0
+Werkzeug==3.0.6
