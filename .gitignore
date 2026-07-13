@@ -1,0 +1,22 @@
+.env
+.env.*
+!.env.example
+server/.env
+server/.env.*
+server/firebase-auth.json
+server/app.log
+app.log
+*.log
+server/__pycache__/
+**/__pycache__/
+proj-i1/build/
+proj-i1/node_modules/
+
+# Python Virtual Environments
+ATS/
+venv/
+.venv/
+env/
+
+# Download metadata streams
+*_Zone.Identifier

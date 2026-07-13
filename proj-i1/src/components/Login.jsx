@@ -1,84 +1,107 @@
-import React, { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useContext, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { AuthContext } from './AuthContext.jsx';
+import { API_ENDPOINTS, apiCall } from '../config/api.js';
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useContext(AuthContext);
+  const redirectTo = location.state?.from?.pathname || '/';
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleChange = (event) => {
+    setFormData({ ...formData, [event.target.name]: event.target.value });
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setLoading(true);
     setMessage('');
     try {
-      const response = await fetch('http://localhost:5001/api/login', {
+      const data = await apiCall(API_ENDPOINTS.LOGIN, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
-        credentials: 'include',
       });
-      const data = await response.json();
-      if (response.ok) {
-        setMessage('Login successful!');
-        login();
-        navigate('/'); // Redirect to home page
-      } else {
-        setMessage(data.error || 'Login failed. Please try again.');
-      }
+      login(data.user);
+      navigate(redirectTo, { replace: true });
     } catch (error) {
-      setMessage('An error occurred. Please try again.');
-      console.error('Login error:', error);
+      setMessage(error.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">Login</h2>
-        {message && <div className={`mb-4 text-center ${message.includes('successful') ? 'text-green-500' : 'text-red-500'}`}>{message}</div>}
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">Email</label>
+    <main className="min-h-screen bg-slate-900 px-5 py-16 text-white">
+      <section className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[0.8fr_1fr] lg:items-center">
+        <div>
+          <p className="mb-4 text-sm font-black uppercase tracking-[0.22em] text-amber-400">Welcome back</p>
+          <h1 className="text-5xl font-black leading-tight">Login to continue your ResumeNexa workflow.</h1>
+          <p className="mt-5 text-base leading-8 text-slate-400">
+            Browsing is open for everyone. Editing resumes, analyzing files, and applying from job details need an account.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="border border-amber-500/15 bg-slate-950/70 backdrop-blur-md p-6 shadow-[0_28px_90px_rgba(0,0,0,0.4)]">
+          <h2 className="mb-6 text-2xl font-black">Login</h2>
+          {message && <div className="mb-4 border border-rose-300/30 bg-rose-500/10 p-3 text-sm text-rose-100">{message}</div>}
+
+          <label className="mb-4 block">
+            <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-amber-400">Email</span>
             <input
               type="email"
-              id="email"
               name="email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter your email"
+              className="h-13 w-full border border-amber-500/15 bg-slate-900 px-4 py-4 text-sm font-bold text-white outline-none placeholder:text-slate-500"
+              placeholder="you@example.com"
               required
             />
-          </div>
-          <div className="mb-6">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter your password"
-              required
-            />
-          </div>
+          </label>
+
+          <label className="mb-6 block">
+            <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-amber-400">Password</span>
+            <div className="flex border border-amber-500/15 bg-slate-900">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                className="h-13 w-full bg-transparent px-4 py-4 text-sm font-bold text-white outline-none placeholder:text-slate-500"
+                placeholder="Enter your password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((value) => !value)}
+                className="flex w-14 items-center justify-center text-amber-400 transition hover:text-white"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </label>
+
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${loading ? 'bg-blue-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+            className="min-h-13 w-full bg-amber-400 px-6 py-4 text-sm font-black uppercase tracking-[0.14em] text-[#0f172a] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? 'Logging In...' : 'Login'}
+            {loading ? 'Logging in...' : 'Login'}
           </button>
+
+          <p className="mt-5 text-center text-sm text-slate-400">
+            New here? <Link to="/signup" state={location.state} className="font-black text-amber-400">Create an account</Link>
+          </p>
         </form>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 };
 

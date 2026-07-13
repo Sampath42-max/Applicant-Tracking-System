@@ -2,10 +2,17 @@ import React, { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 
+const scoreMeta = [
+  { key: 'experienceSkillsScore', label: 'Content', note: 'Experience, skills, and relevance' },
+  { key: 'structureFormattingScore', label: 'Formatting', note: 'ATS-safe structure and readability' },
+  { key: 'grammarReadabilityScore', label: 'Impact', note: 'Clarity, metrics, and action language' },
+  { key: 'keywordMatchingScore', label: 'Keywords', note: 'Role and industry keyword coverage' },
+];
+
 const ResultsPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { analysis, analysisType } = location.state || {};
+  const { analysis, analysisType, targetRole: stateTargetRole } = location.state || {};
 
   useEffect(() => {
     if (!analysis || !analysisType) {
@@ -13,280 +20,318 @@ const ResultsPage = () => {
     }
   }, [analysis, analysisType, navigate]);
 
-  const handleDownloadReport = () => {
-    if (!analysis) return;
+  if (!analysis || !analysisType) return null;
 
-    const doc = new jsPDF();
-    let yOffset = 20;
+  const targetRole = stateTargetRole || analysis.targetRole || '';
+  const details = analysis.normalScoreDetails || {};
+  const overallScore = Number(analysis.normalScore || 0);
 
-    doc.setFontSize(20);
-    doc.text('Resume Analysis Report', 20, yOffset);
-    yOffset += 10;
+  const cleanText = (value) => {
+    if (value === null || value === undefined) return '';
+    let text = String(value);
 
-    if (analysisType === 'withoutCompany') {
-      const { normalScore = 0, normalScoreDetails = {} } = analysis;
-      const { keywordMatchingScore = 0, structureFormattingScore = 0, experienceSkillsScore = 0, grammarReadabilityScore = 0 } = normalScoreDetails;
-
-      doc.setFontSize(16);
-      doc.text(`General ATS Score: ${normalScore}%`, 20, yOffset);
-      yOffset += 10;
-
-      doc.setFontSize(12);
-      doc.text(`Content: ${experienceSkillsScore}%`, 20, yOffset);
-      yOffset += 5;
-      doc.text(`Formatting: ${structureFormattingScore}%`, 20, yOffset);
-      yOffset += 5;
-      doc.text(`Impact: ${grammarReadabilityScore}%`, 20, yOffset);
-      yOffset += 5;
-      doc.text(`Keywords: ${keywordMatchingScore}%`, 20, yOffset);
-      yOffset += 10;
-    } else if (analysisType === 'withCompany') {
-      const { combinedAtsScore = 0, companyName = 'Unknown', companyScore = 0, companyScoreDetails = {} } = analysis;
-      const { industryMatchScore = 0, companyReputationScore = 0, jobRoleMatchScore = 0, tenureScore = 0 } = companyScoreDetails;
-
-      doc.setFontSize(16);
-      doc.text(`Combined ATS Score: ${combinedAtsScore}%`, 20, yOffset);
-      yOffset += 10;
-      doc.text(`Company-Specific Score for ${companyName}: ${companyScore}%`, 20, yOffset);
-      yOffset += 10;
-
-      doc.setFontSize(12);
-      doc.text(`Industry Match: ${industryMatchScore}%`, 20, yOffset);
-      yOffset += 5;
-      doc.text(`Reputation: ${companyReputationScore}%`, 20, yOffset);
-      yOffset += 5;
-      doc.text(`Role Match: ${jobRoleMatchScore}%`, 20, yOffset);
-      yOffset += 5;
-      doc.text(`Tenure: ${tenureScore}%`, 20, yOffset);
-      yOffset += 10;
+    if (typeof document !== 'undefined') {
+      const textarea = document.createElement('textarea');
+      textarea.innerHTML = text;
+      text = textarea.value;
     }
 
-    const suggestions = generateSuggestions();
-    if (suggestions.length > 0) {
-      doc.setFontSize(16);
-      doc.text('Improvement Suggestions', 20, yOffset);
-      yOffset += 10;
+    const printableText = Array.from(text)
+      .filter((char) => {
+        const code = char.charCodeAt(0);
+        return code === 9 || code === 10 || code === 13 || (code >= 32 && code <= 126);
+      })
+      .join('');
 
-      doc.setFontSize(12);
-      suggestions.forEach((suggestion, index) => {
-        if (yOffset > 270) {
-          doc.addPage();
-          yOffset = 20;
-        }
-        doc.text(`${index + 1}. ${suggestion.title} (${suggestion.priority})`, 20, yOffset);
-        yOffset += 5;
-        doc.text(suggestion.description, 20, yOffset, { maxWidth: 170 });
-        yOffset += 10;
+    return printableText
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/(?:&[A-Za-z0-9#]+;?){2,}/g, ' ')
+      .replace(/&[#A-Za-z0-9]+;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/^[-*•\d.)\s]+/, '')
+      .trim();
+  };
+
+  const cleanList = (items = []) =>
+    items
+      .map(cleanText)
+      .filter((item) => item && item.length > 2)
+      .slice(0, 8);
+
+  const suggestions = (() => {
+    const aiSuggestions = cleanList(details.improvements || []).map((description, index) => ({
+      title: targetRole ? `${targetRole} improvement ${index + 1}` : `Resume improvement ${index + 1}`,
+      priority: index < 2 ? 'High priority' : 'Recommended',
+      description,
+    }));
+
+    if (aiSuggestions.length) return aiSuggestions;
+
+    const generated = [];
+    if ((details.keywordMatchingScore || 0) < 80) {
+      generated.push({
+        title: targetRole ? `Add ${targetRole} keywords` : 'Add stronger role keywords',
+        priority: 'High priority',
+        description: targetRole
+          ? `Add skills, tools, and responsibility phrases that commonly appear in ${targetRole} job descriptions.`
+          : 'Add role-specific skills, tools, and responsibility phrases from the jobs you are targeting.',
+      });
+    }
+    if ((details.grammarReadabilityScore || 0) < 80) {
+      generated.push({
+        title: 'Make achievements measurable',
+        priority: 'High priority',
+        description: 'Rewrite bullets with action verbs, scope, and measurable outcomes such as percentages, volume, time saved, or quality improvements.',
+      });
+    }
+    if ((details.structureFormattingScore || 0) < 80) {
+      generated.push({
+        title: 'Improve ATS formatting',
+        priority: 'Recommended',
+        description: 'Use standard section names, simple bullet lists, consistent dates, and avoid symbols or layouts that can break parsing.',
+      });
+    }
+    return generated;
+  })();
+
+  const strengths = cleanList(details.strengths || []);
+  const strongKeywords = cleanList(details.keywordAnalysis?.strongKeywords || []);
+  const missingKeywords = cleanList(details.keywordAnalysis?.missingKeywords || []);
+  const scoreCards = scoreMeta.map((item) => ({
+    ...item,
+    value: Number(details[item.key] || 0),
+  }));
+
+  const scoreTone = overallScore >= 85 ? 'Excellent' : overallScore >= 70 ? 'Good' : overallScore >= 55 ? 'Needs work' : 'Needs major improvement';
+
+  const writeWrapped = (doc, text, x, y, maxWidth, lineHeight = 5) => {
+    const lines = doc.splitTextToSize(cleanText(text), maxWidth);
+    doc.text(lines, x, y);
+    return y + lines.length * lineHeight;
+  };
+
+  const ensurePage = (doc, y, needed = 24) => {
+    if (y + needed <= 282) return y;
+    doc.addPage();
+    return 22;
+  };
+
+  const handleDownloadReport = () => {
+    const doc = new jsPDF();
+    let y = 18;
+
+    doc.setFillColor(18, 24, 38);
+    doc.rect(0, 0, 210, 42, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(19);
+    doc.text('Resume Score Report', 18, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(targetRole ? `Target role: ${cleanText(targetRole)}` : 'Target role: General resume review', 18, y + 8);
+    doc.text('ATS readiness, content quality, formatting, impact, and keyword review', 18, y + 15);
+
+    y = 56;
+    doc.setTextColor(18, 24, 38);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.text('Overall Score', 18, y);
+    doc.setFontSize(32);
+    doc.text(`${overallScore}%`, 158, y + 2);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text(scoreTone, 158, y + 10);
+
+    y += 22;
+    scoreCards.forEach((card, index) => {
+      const x = 18 + (index % 2) * 88;
+      const rowY = y + Math.floor(index / 2) * 26;
+      doc.setDrawColor(220, 226, 235);
+      doc.roundedRect(x, rowY, 78, 19, 2, 2);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text(card.label, x + 5, rowY + 7);
+      doc.setFontSize(13);
+      doc.text(`${card.value}%`, x + 58, rowY + 7);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text(cleanText(card.note), x + 5, rowY + 14, { maxWidth: 66 });
+    });
+
+    y += 60;
+    if (strengths.length) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text('Strengths', 18, y);
+      y += 8;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      strengths.forEach((item, index) => {
+        y = ensurePage(doc, y, 18);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${index + 1}.`, 18, y);
+        doc.setFont('helvetica', 'normal');
+        y = writeWrapped(doc, item, 26, y, 164) + 4;
       });
     }
 
-    doc.save('resume-analysis-report.pdf');
-  };
+    if (suggestions.length) {
+      y = ensurePage(doc, y, 24);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text('Improvement Plan', 18, y);
+      y += 8;
+      suggestions.forEach((suggestion, index) => {
+        y = ensurePage(doc, y, 26);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text(`${index + 1}. ${cleanText(suggestion.title)}`, 18, y);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.text(cleanText(suggestion.priority), 18, y + 5);
+        doc.setFontSize(10);
+        y = writeWrapped(doc, suggestion.description, 18, y + 11, 174) + 6;
+      });
+    }
 
-  const generateSuggestions = () => {
-    if (!analysis) return [];
-
-    const suggestions = [];
-    if (analysisType === 'withoutCompany') {
-      const { normalScoreDetails = {} } = analysis;
-      const { keywordMatchingScore = 0, structureFormattingScore = 0, experienceSkillsScore = 0, grammarReadabilityScore = 0, sectionsFound = [] } = normalScoreDetails;
-
-      if (experienceSkillsScore < 80) {
-        suggestions.push({
-          title: 'Quantify Achievements',
-          priority: 'High Priority',
-          description: 'Add specific metrics to showcase your impact, e.g., "Increased sales by 30%."',
-        });
+    if (strongKeywords.length || missingKeywords.length) {
+      y = ensurePage(doc, y, 28);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text('Keyword Notes', 18, y);
+      y += 8;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      if (strongKeywords.length) {
+        y = writeWrapped(doc, `Strong keywords: ${strongKeywords.join(', ')}`, 18, y, 174) + 5;
       }
-      if (!sectionsFound.includes('skills')) {
-        suggestions.push({
-          title: 'Add Skills Section',
-          priority: 'Medium Priority',
-          description: 'Include a dedicated skills section with relevant technical and soft skills.',
-        });
-      }
-      if (structureFormattingScore < 80) {
-        suggestions.push({
-          title: 'Improve Formatting',
-          priority: 'Low Priority',
-          description: 'Ensure consistent fonts, spacing, and bullet styles throughout.',
-        });
-      }
-      if (keywordMatchingScore < 80) {
-        suggestions.push({
-          title: 'Optimize Keywords',
-          priority: 'High Priority',
-          description: 'Incorporate more job-specific keywords to boost ATS compatibility.',
-        });
-      }
-    } else if (analysisType === 'withCompany') {
-      const { companyName = 'Unknown', companyScoreDetails = {} } = analysis;
-      const { jobRoleMatchScore = 0, tenureScore = 0 } = companyScoreDetails;
-
-      if (jobRoleMatchScore < 70) {
-        suggestions.push({
-          title: 'Tailor Job Roles',
-          priority: 'High Priority',
-          description: `Align past roles with the target position at ${companyName}.`,
-        });
-      }
-      if (tenureScore < 60) {
-        suggestions.push({
-          title: 'Showcase Stability',
-          priority: 'Medium Priority',
-          description: 'Highlight longer job tenures to demonstrate commitment.',
-        });
+      if (missingKeywords.length) {
+        y = ensurePage(doc, y, 16);
+        y = writeWrapped(doc, `Consider adding: ${missingKeywords.join(', ')}`, 18, y, 174) + 5;
       }
     }
-    return suggestions;
+
+    const pageCount = doc.getNumberOfPages();
+    for (let page = 1; page <= pageCount; page += 1) {
+      doc.setPage(page);
+      doc.setTextColor(110, 118, 130);
+      doc.setFontSize(8);
+      doc.text(`ResumeNexa report • Page ${page} of ${pageCount}`, 18, 290);
+    }
+
+    doc.save('resume-score-report.pdf');
   };
 
-  if (!analysis || !analysisType) return null;
-
-  const suggestions = generateSuggestions();
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-gray-900 py-10 px-4 sm:px-6 lg:px-8">
-      <h1 className="text-4xl sm:text-5xl font-bold text-white text-center">Resume Analysis Results</h1>
-      <p className="text-lg text-gray-300 text-center mt-4">
-        Review your resume’s performance and download the detailed report.
-      </p>
-      {analysisType === 'withoutCompany' && (
-        <div className="mt-8 p-6 bg-white rounded-lg shadow-lg max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-blue-900 text-center">General Resume Analysis</h2>
-          <p className="text-center text-gray-600 mt-2">Your resume’s performance against industry standards.</p>
-          <div className="mt-6 text-center">
-            <h3 className="text-2xl font-semibold text-blue-800">
-              General ATS Score: {analysis.normalScore || 0}%
-            </h3>
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-gray-50 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
-                <h4 className="text-xl font-bold text-blue-800">{analysis.normalScoreDetails?.experienceSkillsScore || 0}%</h4>
-                <p className="text-sm text-gray-600 mt-1">Content</p>
-                <p className="text-xs text-gray-400">Quality of your experience and skills.</p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
-                <h4 className="text-xl font-bold text-blue-800">{analysis.normalScoreDetails?.structureFormattingScore || 0}%</h4>
-                <p className="text-sm text-gray-600 mt-1">Formatting</p>
-                <p className="text-xs text-gray-400">Layout and visual structure.</p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
-                <h4 className="text-xl font-bold text-blue-800">{analysis.normalScoreDetails?.grammarReadabilityScore || 0}%</h4>
-                <p className="text-sm text-gray-600 mt-1">Impact</p>
-                <p className="text-xs text-gray-400">Clarity and effectiveness.</p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
-                <h4 className="text-xl font-bold text-blue-800">{analysis.normalScoreDetails?.keywordMatchingScore || 0}%</h4>
-                <p className="text-sm text-gray-600 mt-1">Keywords</p>
-                <p className="text-xs text-gray-400">ATS keyword optimization.</p>
-              </div>
+    <div className="relative min-h-screen overflow-hidden bg-slate-900 px-4 py-10 text-white sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_12%,rgba(251,191,36,0.12),transparent_28%),radial-gradient(circle_at_82%_8%,rgba(255,255,255,0.08),transparent_30%),linear-gradient(135deg,#0f172a_0%,#020617_55%,#020617_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(251,191,36,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(251,191,36,0.05)_1px,transparent_1px)] bg-[size:42px_42px] opacity-70" />
+      <div className="relative z-10 mx-auto max-w-7xl">
+        <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="border border-amber-500/10 bg-slate-950/70 p-7 shadow-[0_28px_90px_rgba(0,0,0,0.28)] backdrop-blur-md">
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-amber-400">Resume analysis complete</p>
+            <h1 className="mt-3 text-4xl font-black leading-tight text-white sm:text-5xl">Your resume score report is ready.</h1>
+            <p className="mt-4 text-base leading-7 text-slate-300">
+              {targetRole
+                ? `Suggestions are tailored for ${targetRole}.`
+                : 'This review is role-neutral. Add a target role next time for more specific keyword recommendations.'}
+            </p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <button
+                onClick={handleDownloadReport}
+                className="bg-amber-400 px-6 py-3 font-black text-slate-950 shadow-[0_20px_55px_rgba(251,191,36,0.18)] transition hover:-translate-y-1 hover:bg-white"
+              >
+                Download Report
+              </button>
+              <button
+                onClick={() => navigate('/resume-checker')}
+                className="border border-amber-500/15 bg-slate-900/70 px-6 py-3 font-black text-white transition hover:-translate-y-1 hover:border-amber-400"
+              >
+                Analyze Another Resume
+              </button>
             </div>
           </div>
-          {suggestions.length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-2xl font-semibold text-blue-800 text-center">Improvement Suggestions</h3>
-              <div className="mt-4 space-y-4">
-                {suggestions.map((suggestion, index) => (
-                  <div key={index} className="bg-gray-50 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
-                    <div className="flex items-center">
-                      <span className="text-2xl mr-3 text-yellow-500">💡</span>
-                      <div>
-                        <h4 className="text-lg font-semibold text-blue-800">{suggestion.title}</h4>
-                        <p className="text-sm text-red-600">{suggestion.priority}</p>
-                      </div>
-                    </div>
-                    <p className="text-gray-600 mt-2">{suggestion.description}</p>
+
+          <div className="border border-amber-500/10 bg-slate-950/70 p-7 text-white shadow-[0_28px_90px_rgba(0,0,0,0.34)] backdrop-blur-md">
+            <div className="flex items-start justify-between gap-6">
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.18em] text-amber-400">Overall resume score</p>
+                <p className="mt-3 text-7xl font-black leading-none">{overallScore}%</p>
+              </div>
+              <span className="rounded-full bg-amber-400/10 px-4 py-2 text-sm font-black text-white">{scoreTone}</span>
+            </div>
+            <div className="mt-7 h-3 overflow-hidden rounded-full bg-white/15">
+              <div className="h-full rounded-full bg-amber-400" style={{ width: `${Math.min(overallScore, 100)}%` }} />
+            </div>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              {scoreCards.map((card) => (
+                <div key={card.key} className="rounded-lg border border-amber-500/10 bg-slate-900/70 p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="font-black">{card.label}</p>
+                    <p className="text-xl font-black text-amber-400">{card.value}%</p>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="mt-6 flex justify-center gap-4">
-            <button
-              className="px-6 py-2 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-700 transition-colors"
-              onClick={handleDownloadReport}
-            >
-              Download Report
-            </button>
-            <button
-              className="px-6 py-2 bg-gray-600 text-white rounded-full font-semibold hover:bg-gray-700 transition-colors"
-              onClick={() => navigate('/resume-checker')}
-            >
-              Analyze Another Resume
-            </button>
-          </div>
-        </div>
-      )}
-      {analysisType === 'withCompany' && (
-        <div className="mt-8 p-6 bg-white rounded-lg shadow-lg max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-blue-900 text-center">Company-Specific Analysis</h2>
-          <p className="text-center text-gray-600 mt-2">Optimized for {analysis.companyName || 'Unknown'}.</p>
-          <div className="mt-6 text-center">
-            <span className="text-4xl font-bold text-yellow-500">{analysis.combinedAtsScore || 0}%</span>
-            <p className="text-sm text-gray-600 mt-1">Combined ATS Score</p>
-          </div>
-          <div className="mt-4 text-center">
-            <h3 className="text-2xl font-semibold text-blue-800">
-              Score for {analysis.companyName || 'Unknown'}: {analysis.companyScore || 0}%
-            </h3>
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-gray-50 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
-                <h4 className="text-xl font-bold text-blue-800">{analysis.companyScoreDetails?.industryMatchScore || 0}%</h4>
-                <p className="text-sm text-gray-600 mt-1">Industry Match</p>
-                <p className="text-xs text-gray-400">Alignment with industry.</p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
-                <h4 className="text-xl font-bold text-blue-800">{analysis.companyScoreDetails?.companyReputationScore || 0}%</h4>
-                <p className="text-sm text-gray-600 mt-1">Reputation</p>
-                <p className="text-xs text-gray-400">Company tier evaluation.</p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
-                <h4 className="text-xl font-bold text-blue-800">{analysis.companyScoreDetails?.jobRoleMatchScore || 0}%</h4>
-                <p className="text-sm text-gray-600 mt-1">Role Match</p>
-                <p className="text-xs text-gray-400">Fit for target role.</p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
-                <h4 className="text-xl font-bold text-blue-800">{analysis.companyScoreDetails?.tenureScore || 0}%</h4>
-                <p className="text-sm text-gray-600 mt-1">Tenure</p>
-                <p className="text-xs text-gray-400">Stability assessment.</p>
-              </div>
+                  <p className="mt-2 text-sm leading-5 text-white/65">{card.note}</p>
+                </div>
+              ))}
             </div>
           </div>
-          {suggestions.length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-2xl font-semibold text-blue-800 text-center">Improvement Suggestions</h3>
-              <div className="mt-4 space-y-4">
-                {suggestions.map((suggestion, index) => (
-                  <div key={index} className="bg-gray-50 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
-                    <div className="flex items-center">
-                      <span className="text-2xl mr-3 text-yellow-500">💡</span>
-                      <div>
-                        <h4 className="text-lg font-semibold text-blue-800">{suggestion.title}</h4>
-                        <p className="text-sm text-red-600">{suggestion.priority}</p>
-                      </div>
+        </section>
+
+        <section className="mt-6 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="border border-amber-500/10 bg-slate-950/70 p-6 shadow-[0_18px_55px_rgba(0,0,0,0.22)] backdrop-blur-md">
+            <h2 className="text-2xl font-black text-white">Strengths</h2>
+            <div className="mt-5 space-y-3">
+              {(strengths.length ? strengths : ['Your resume has enough information to generate a score. Add a target role for sharper strengths.']).map((item, index) => (
+                <div key={index} className="border-l-4 border-amber-400 bg-amber-400/10 p-4">
+                  <p className="font-bold leading-6 text-slate-200">{item}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="border border-amber-500/10 bg-slate-950/70 p-6 shadow-[0_18px_55px_rgba(0,0,0,0.22)] backdrop-blur-md">
+            <h2 className="text-2xl font-black text-white">Improvement Plan</h2>
+            <div className="mt-5 space-y-4">
+              {suggestions.map((suggestion, index) => (
+                <article key={index} className="border border-amber-500/10 bg-slate-900/70 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="font-black text-white">{suggestion.title}</h3>
+                      <p className="mt-1 text-xs font-black uppercase tracking-[0.14em] text-amber-400">{suggestion.priority}</p>
                     </div>
-                    <p className="text-gray-600 mt-2">{suggestion.description}</p>
+                    <span className="flex h-9 w-9 items-center justify-center bg-amber-400 text-sm font-black text-slate-950">{index + 1}</span>
                   </div>
-                ))}
+                  <p className="mt-3 leading-6 text-slate-300">{suggestion.description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {(strongKeywords.length > 0 || missingKeywords.length > 0) && (
+          <section className="mt-6 border border-amber-500/10 bg-slate-950/70 p-6 shadow-[0_18px_55px_rgba(0,0,0,0.22)] backdrop-blur-md">
+            <h2 className="text-2xl font-black text-white">Keyword Analysis</h2>
+            <div className="mt-5 grid gap-5 md:grid-cols-2">
+              <div>
+                <h3 className="font-black text-amber-400">Strong keywords found</h3>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {strongKeywords.map((keyword) => (
+                    <span key={keyword} className="rounded-full bg-amber-400/10 px-3 py-1 text-sm font-bold text-white">{keyword}</span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h3 className="font-black text-rose-300">Consider adding</h3>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {missingKeywords.map((keyword) => (
+                    <span key={keyword} className="rounded-full bg-rose-400/10 px-3 py-1 text-sm font-bold text-rose-100">{keyword}</span>
+                  ))}
+                </div>
               </div>
             </div>
-          )}
-          <div className="mt-6 flex justify-center gap-4">
-            <button
-              className="px-6 py-2 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-700 transition-colors"
-              onClick={handleDownloadReport}
-            >
-              Download Report
-            </button>
-            <button
-              className="px-6 py-2 bg-gray-600 text-white rounded-full font-semibold hover:bg-gray-700 transition-colors"
-              onClick={() => navigate('/resume-checker')}
-            >
-              Analyze Another Resume
-            </button>
-          </div>
-        </div>
-      )}
+          </section>
+        )}
+      </div>
     </div>
   );
 };

@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useContext } from 'react';
-import { AuthContext } from '../components/AuthContext.jsx';
+import React, { useEffect, useState } from 'react';
+import { ArrowLeft, Check, Eye, Layers3, Sparkles, Wand2 } from 'lucide-react';
+import './Build.css';
 import ResumePreview1 from '../components/ResumePreview1.jsx';
 import ResumePreview2 from '../components/ResumePreview2.jsx';
 import ResumePreview3 from '../components/ResumePreview3.jsx';
@@ -25,9 +24,7 @@ import template8 from '../assets/template8.png';
 import template9 from '../assets/template9.png';
 import template10 from '../assets/template10.png';
 
-const Build = () => {
-  const navigate = useNavigate();
-  const { isAuthenticated } = useContext(AuthContext);
+function Build() {
   const fallbackImage = 'https://via.placeholder.com/300x400?text=Template+Image+Not+Found';
 
   const initialTemplates = [
@@ -40,7 +37,7 @@ const Build = () => {
     { id: 7, name: 'Academic Style', category: 'full-stack' },
     { id: 8, name: 'Creative Portfolio', category: 'ui-ux' },
     { id: 9, name: 'Modern Geometric', category: 'ai' },
-    { id: 10, name: 'Elegant Vintage', category: 'full-stack' },
+    { id: 10, name: 'Creative Sidebar', category: 'creative' },
   ];
 
   const [filter, setFilter] = useState('all');
@@ -64,33 +61,24 @@ const Build = () => {
     }));
   });
 
-  // Verify authentication
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-    }
-  }, [isAuthenticated, navigate]);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
 
-  const filteredTemplates = templates.filter(
-    (template) => filter === 'all' || template.category === filter
-  );
+  const filteredTemplates = templates;
 
-  const categories = [
-    { id: 'all', name: 'All' },
-    { id: 'full-stack', name: 'Full Stack' },
-    { id: 'ai', name: 'AI' },
-    { id: 'ui-ux', name: 'UI/UX Design' },
-  ];
+  const categories = [];
 
   const handleTemplateSelect = (templateId) => {
     setSelectedTemplateId(templateId);
+    window.scrollTo({ top: 0, behavior: 'auto' });
   };
 
   const handleBackToTemplates = () => {
     setSelectedTemplateId(null);
+    window.scrollTo({ top: 0, behavior: 'auto' });
   };
 
-  // Map template IDs to ResumePreview components
   const resumePreviews = {
     1: ResumePreview1,
     2: ResumePreview2,
@@ -103,81 +91,149 @@ const Build = () => {
     9: ResumePreview9,
     10: ResumePreview10,
   };
+  const SelectedResumePreview = resumePreviews[selectedTemplateId];
 
   if (!templates || templates.length === 0) {
     return <div className="text-center text-gray-600">No templates available</div>;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white to-gray-100 py-16 px-4 sm:px-6 lg:px-10 font-poppins">
+    <div className={`build-page min-h-screen font-poppins ${
+      selectedTemplateId ? 'is-editing px-0 py-0' : 'px-4 py-10 sm:px-6 lg:px-10'
+    }`}>
       {!selectedTemplateId ? (
         // Template Selection Interface
         <>
-          <div className="text-center mb-12">
-            <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-blue-500 to-teal-400 bg-clip-text text-transparent animate-fadeInDown">
-              Choose a Resume Template
-            </h1>
-            <div className="flex flex-wrap justify-center gap-4 mt-6">
-              {categories.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => setFilter(category.id)}
-                  className={`px-6 py-3 rounded-full text-base font-semibold transition-all duration-300 ${
-                    filter === category.id
-                      ? 'bg-gradient-to-r from-blue-500 to-teal-400 text-white shadow-lg'
-                      : 'bg-white text-gray-700 border-2 border-gray-200 hover:bg-gray-50 hover:shadow-md'
-                  }`}
-                >
-                  {category.name}
-                </button>
-              ))}
+          <section className="build-hero mx-auto mb-10 grid max-w-7xl items-center gap-10 lg:grid-cols-[1.04fr_0.96fr]">
+            <div className="build-hero-copy">
+              <div className="build-kicker">
+                <Sparkles size={16} />
+                Design-grade resume studio
+              </div>
+              <h1>
+                Choose the canvas. Build the career artifact.
+              </h1>
+              <p>
+                Pick a recruiter-ready template and edit it in a focused workspace with polished fields,
+                live preview, and export controls tuned for serious resume work.
+              </p>
+              <div className="build-hero-actions" aria-label="Template categories">
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
+                    onClick={() => setFilter(category.id)}
+                    className={`build-filter ${filter === category.id ? 'is-active' : ''}`}
+                  >
+                    {category.name}
+                  </button>
+                ))}
+              </div>
+              <div className="build-trust-row">
+                <span><Check size={16} /> ATS-ready layouts</span>
+                <span><Wand2 size={16} /> AI assisted sections</span>
+                <span><Eye size={16} /> Live preview</span>
+              </div>
+            </div>
+            <div className="resume-3d-stage" aria-hidden="true">
+              <div className="resume-3d-stack">
+                <div className="resume-sheet sheet-back">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <div className="resume-sheet sheet-mid">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <div className="resume-sheet sheet-front">
+                  <div className="sheet-avatar" />
+                  <span />
+                  <span />
+                  <span />
+                  <div className="sheet-grid">
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                  </div>
+                </div>
+              </div>
+              <div className="studio-ring ring-one" />
+              <div className="studio-ring ring-two" />
+            </div>
+          </section>
+
+          <div className="template-toolbar mx-auto mb-7 max-w-7xl">
+            <div>
+              <span className="template-count">{filteredTemplates.length}</span>
+              <span className="template-count-label">templates shown</span>
+            </div>
+            <div className="toolbar-note">
+              <Layers3 size={16} />
+              Hover a template to inspect depth, then select to open the editor.
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 max-w-7xl mx-auto">
+
+          <section className="template-grid max-w-7xl mx-auto" aria-label="Resume templates">
             {filteredTemplates.map((template) => (
-              <div
+              <article
                 key={template.id}
-                className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300"
+                className="template-card"
               >
-                <div className="p-6 text-center">
+                <div className="template-preview-shell">
                   <img
                     src={template.image}
                     alt={template.name}
-                    className="w-full h-auto rounded-lg hover:scale-105 transition-transform duration-300"
-                    onError={(e) => (e.target.src = fallbackImage)}
+                    className="template-image"
+                    onError={(event) => { event.target.src = fallbackImage; }}
                     loading="lazy"
                   />
-                  <h3 className="text-xl font-semibold text-gray-800 mt-4 mb-3">{template.name}</h3>
+                </div>
+                <div className="template-meta">
+                  <div>
+                    <p>{template.category.replace('-', ' ')}</p>
+                    <h3>{template.name}</h3>
+                  </div>
                   <button
+                    type="button"
                     onClick={() => handleTemplateSelect(template.id)}
-                    className="bg-gradient-to-r from-green-500 to-green-400 text-white px-6 py-3 rounded-full font-semibold text-sm hover:from-green-600 hover:to-green-500 hover:-translate-y-1 shadow-md hover:shadow-lg transition-all"
+                    className="select-template-btn"
                     aria-label={`Select ${template.name}`}
                   >
-                    Select Template
+                    <span>Select</span>
+                    <ArrowLeft size={16} aria-hidden="true" />
                   </button>
                 </div>
-              </div>
+              </article>
             ))}
-          </div>
+          </section>
         </>
       ) : (
         // Input Sections and Live Preview
-        <div className="max-w-7xl mx-auto">
+        <div className="template-editor-stage">
+          <div className="studio-topbar">
           <button
             onClick={handleBackToTemplates}
-            className="mb-6 px-6 py-3 bg-gradient-to-r from-slate-900 to-gray-400 text-gray-200 rounded-full font-semibold hover:from-gray-600 hover:to-gray-500 transition-all"
+              className="studio-back-btn"
           >
-            Back to Templates
+              <ArrowLeft size={18} />
+              Back to Templates
           </button>
-          {selectedTemplateId && resumePreviews[selectedTemplateId] ? (
-            React.createElement(resumePreviews[selectedTemplateId], {})
-          ) : (
-            <div className="text-center text-gray-600">Invalid template selected</div>
-          )}
+            <div className="studio-status">
+              <span>Template {selectedTemplateId}</span>
+              <strong>Editing workspace</strong>
+            </div>
+          </div>
+          {SelectedResumePreview ? (
+            <div className="resume-studio-shell">
+              <SelectedResumePreview />
+            </div>
+          ) : null}
         </div>
       )}
     </div>
   );
-};
+}
 
 export default Build;
