@@ -1,4 +1,4 @@
-import React, { Suspense, Component, useContext, useEffect, useState } from 'react';
+import React, { Suspense, Component, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useParams, useLocation } from 'react-router-dom';
 import Build from './pages/Build.js';
 import axios from 'axios';
@@ -6,11 +6,6 @@ import ResumeChecker from './components/ResumeChecker.js';
 import LoadingPage from './components/LoadingPage.jsx';
 import ResultsPage from './components/ResultsPage.jsx';
 import resumeNexaLogo from './assets/Resumenexa.png';
-import Login from './components/Login.jsx';
-import Signup from './components/Signup.jsx';
-import Profile from './components/Profile.jsx';
-import ProtectedRoute from './components/ProtectedRoute.jsx';
-import { AuthContext, AuthProvider } from './components/AuthContext.jsx';
 import MatrixAssemblyResume from './components/MatrixAssemblyResume.jsx';
 
 const Details = () => (
@@ -259,7 +254,6 @@ const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const { isAuthenticated, user, logout, loading } = useContext(AuthContext);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -332,43 +326,11 @@ const Header = () => {
             })}
           </nav>
 
-          {!loading && isAuthenticated ? (
-            <div className="flex items-center gap-3">
-              <Link to="/profile" className="text-right transition hover:opacity-80" aria-label="Open your profile">
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-400">Profile</p>
-                <p className="max-w-36 truncate text-sm font-black text-white">{user?.fullName || user?.email}</p>
-              </Link>
-              <button
-                onClick={logout}
-                className="h-12 border border-amber-500/15 bg-amber-400 px-5 text-sm font-black uppercase tracking-[0.12em] text-[#0f172a] shadow-[0_14px_32px_rgba(0,0,0,0.25)] transition duration-500 hover:-translate-y-0.5 hover:bg-white"
-              >
-                Logout
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <Link to="/login" className="text-sm font-black text-slate-400 transition hover:text-white">
-                Login
-              </Link>
-              <Link to="/signup">
-                <button className="h-12 border border-amber-500/15 bg-amber-400 px-5 text-sm font-black uppercase tracking-[0.12em] text-[#0f172a] shadow-[0_14px_32px_rgba(0,0,0,0.25)] transition duration-500 hover:-translate-y-0.5 hover:bg-white">
-                  Signup
-                </button>
-              </Link>
-            </div>
-          )}
+          
         </div>
 
         <div className="flex items-center gap-2 lg:hidden">
-          {!loading && isAuthenticated ? (
-            <button onClick={logout} className="bg-amber-400 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-[#0f172a]">
-              Logout
-            </button>
-          ) : (
-            <Link to="/login" className="bg-amber-400 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-[#0f172a]">
-              Login
-            </Link>
-          )}
+          
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="flex h-11 w-11 items-center justify-center border border-amber-500/15 bg-slate-950/70 backdrop-blur-md transition hover:border-amber-500"
@@ -401,12 +363,7 @@ const Header = () => {
         }`}
       >
         <nav className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4 sm:px-6">
-          {!loading && isAuthenticated && (
-            <Link to="/profile" className="border border-amber-500/12 bg-slate-950/70 backdrop-blur-md px-4 py-4 text-sm text-slate-400 transition hover:border-amber-400">
-              <span className="block text-xs font-black uppercase tracking-[0.16em] text-amber-400">Signed in</span>
-              <span className="mt-1 block font-black text-white">{user?.fullName || user?.email}</span>
-            </Link>
-          )}
+          
           {navLinks.map((link) => {
             const isActive = location.pathname === link.path;
             return (
@@ -442,14 +399,11 @@ const App = () => {
         <Route path="/" element={<Home />} />
         <Route path="/details" element={<Details />} />
         <Route path="/optimize" element={<Optimize />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-        <Route path="/build" element={<ProtectedRoute><Build /></ProtectedRoute>} />
-        <Route path="/resume-checker" element={<ProtectedRoute><ResumeChecker /></ProtectedRoute>} />
-        <Route path="/results" element={<ProtectedRoute><ResultsPage /></ProtectedRoute>} />
-        <Route path="/build/edit/:id" element={<ProtectedRoute><Edit /></ProtectedRoute>} />
-        <Route path="/loading" element={<ProtectedRoute><LoadingPage /></ProtectedRoute>} />
+        <Route path="/build" element={<Build />} />
+        <Route path="/resume-checker" element={<ResumeChecker />} />
+        <Route path="/results" element={<ResultsPage />} />
+        <Route path="/build/edit/:id" element={<Edit />} />
+        <Route path="/loading" element={<LoadingPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
 
@@ -500,12 +454,10 @@ const App = () => {
 
 const AppWrapper = () => (
   <Router>
-    <AuthProvider>
-      <ErrorBoundary>
+          <ErrorBoundary>
         <App />
       </ErrorBoundary>
-    </AuthProvider>
-  </Router>
+      </Router>
 );
 
 export default AppWrapper;

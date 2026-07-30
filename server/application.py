@@ -184,257 +184,6 @@ def rate_limit_response(request, bucket, limit, window_seconds):
 
 
 
-mongo_client = None
-mongodb_db = None
-
-# In-memory user database
-USERS_DB = {}  # user_id -> user_dict
-USERS_EMAIL_MAP = {}  # email -> user_id
-
-def serialize_doc(doc):
-    if not doc:
-        return None
-    doc = dict(doc)
-    if "_id" in doc:
-        doc["id"] = str(doc["_id"])
-        del doc["_id"]
-    for k, v in doc.items():
-        if isinstance(v, ObjectId):
-            doc[k] = str(v)
-        elif isinstance(v, datetime):
-            doc[k] = v.isoformat()
-    return doc
-
-def get_db_connection():
-    global mongo_client, mongodb_db
-    if pymongo is None:
-        raise RuntimeError("pymongo is not installed. Install it from requirements.txt.")
-    
-    if mongo_client is None:
-        mongo_uri = settings.MONGODB_URI
-        db_name = settings.MONGODB_DATABASE
-        
-        # Initialize client
-        mongo_client = pymongo.MongoClient(mongo_uri)
-        mongodb_db = mongo_client[db_name]
-        
-        # Create indexes for collections
-        try:
-            mongodb_db.resumes.create_index("user_id")
-        except Exception as idx_err:
-            logger.warning(f"Could not create MongoDB indexes: {idx_err}")
-            
-    return mongodb_db
-
-def database_error_response(exc, action):
-    message = str(exc)
-    logger.error(f"{action} database error: {message}", exc_info=True)
-    return JSONResponse(
-        {"error": f"Could not {action.lower()}. Please check database configuration."},
-        status_code=500,
-    )
-
-def public_user(user):
-    if not user:
-        return None
-    return {
-        "id": user.get("id"),
-        "fullName": user.get("full_name") or "",
-        "email": user.get("email") or "",
-        "authProvider": user.get("auth_provider") or "email",
-        "profilePicture": user.get("profile_picture"),
-        "createdAt": str(user.get("created_at")) if user.get("created_at") else None,
-    }
-
-def fetch_user_by_id(user_id):
-    try:
-        user = USERS_DB.get(user_id)
-        if user:
-            return serialize_doc(user)
-        return None
-    except Exception as exc:
-        logger.error(f"Error fetching user by id: {exc}")
-        return None
-
-def fetch_user_by_email(email):
-    try:
-        email_clean = email.lower().strip()
-        user_id = USERS_EMAIL_MAP.get(email_clean)
-        if user_id and user_id in USERS_DB:
-            return serialize_doc(USERS_DB[user_id])
-        return None
-    except Exception as exc:
-        logger.error(f"Error fetching user by email: {exc}")
-        return None
-
-def store_resume_record(user_id, file_name, extracted_text):
-    try:
-        db = get_db_connection()
-        user_oid = ObjectId(user_id)
-        db.resumes.insert_one({
-            "user_id": user_oid,
-            "file_name": file_name,
-            "file_url": None,
-            "extracted_text": extracted_text,
-            "uploaded_at": datetime.now()
-        })
-    except Exception as exc:
-        logger.warning(f"Could not store resume metadata: {str(exc)}")
-
-def fetch_profile_activity(user_id):
-    db = get_db_connection()
-    try:
-        user_oid = ObjectId(user_id)
-    except (InvalidId, TypeError):
-        return {"resumes": [], "savedJobs": [], "stats": {"resumeCount": 0, "savedJobCount": 0}}
-    
-    # Fetch resumes
-    resumes_cursor = db.resumes.find({"user_id": user_oid}).sort("uploaded_at", -1).limit(20)
-    resumes = [serialize_doc(r) for r in resumes_cursor]
-    resume_count = db.resumes.count_documents({"user_id": user_oid})
-    
-    # Fetch saved jobs using aggregation (join with jobs)
-    pipeline = [
-        { "$match": { "user_id": user_oid } },
-        { "$sort": { "saved_at": -1 } },
-        { "$limit": 20 },
-        {
-            "$lookup": {
-                "from": "jobs",
-                "localField": "job_id",
-                "foreignField": "_id",
-                "as": "job_details"
-            }
-        },
-        { "$unwind": { "path": "$job_details", "preserveNullAndEmptyArrays": True } },
-        {
-            "$project": {
-                "_id": 0,
-                "saved_id": "$_id",
-                "saved_at": 1,
-                "job_id": "$job_details._id",
-                "job_title": "$job_details.job_title",
-                "company": "$job_details.company",
-                "location": "$job_details.location",
-                "job_description": "$job_details.job_description",
-                "apply_link": "$job_details.apply_link",
-                "source": "$job_details.source",
-                "posted_at": "$job_details.posted_at"
-            }
-        }
-    ]
-    saved_jobs_cursor = db.saved_jobs.aggregate(pipeline)
-    saved_jobs = []
-    for sj in saved_jobs_cursor:
-        sj["saved_id"] = str(sj["saved_id"])
-        if sj.get("job_id"):
-            sj["job_id"] = str(sj["job_id"])
-        else:
-            sj["job_id"] = ""
-        if sj.get("saved_at") and isinstance(sj["saved_at"], datetime):
-            sj["saved_at"] = sj["saved_at"].isoformat()
-        if sj.get("posted_at") and isinstance(sj["posted_at"], datetime):
-            sj["posted_at"] = sj["posted_at"].isoformat()
-        saved_jobs.append(sj)
-        
-    saved_job_count = db.saved_jobs.count_documents({"user_id": user_oid})
-    
-    return {
-        "resumes": convert_keys_to_camel_case(resumes),
-        "savedJobs": convert_keys_to_camel_case(saved_jobs),
-        "stats": {"resumeCount": resume_count, "savedJobCount": saved_job_count},
-    }
-
-def store_saved_job(user_id, job):
-    db = get_db_connection()
-    try:
-        user_oid = ObjectId(user_id)
-    except (InvalidId, TypeError):
-        raise ValueError("Invalid user ID.")
-        
-    apply_link = job.applyLink.strip()
-    if apply_link and not validate_external_url(apply_link):
-        raise ValueError("The job apply link is invalid.")
-    textual_values = [job.title, job.company, job.location, job.description, job.publisher]
-    if any(not validate_text_input(value, limit) for value, limit in zip(textual_values, [255, 255, 255, 50000, 255])):
-        raise ValueError("Job information contains invalid characters.")
-    posted_at = None
-    if job.postedAt:
-        try:
-            posted_at = datetime.fromisoformat(job.postedAt.replace("Z", "+00:00")).replace(tzinfo=None)
-        except ValueError:
-            posted_at = None
-            
-    # Check if job exists
-    stored_job = db.jobs.find_one({
-        "job_title": job.title.strip(),
-        "company": job.company.strip(),
-        "apply_link": apply_link
-    })
-    
-    if stored_job:
-        job_id = stored_job["_id"]
-    else:
-        # Insert job
-        res = db.jobs.insert_one({
-            "job_title": job.title.strip(),
-            "company": job.company.strip(),
-            "location": job.location.strip(),
-            "job_description": job.description.strip(),
-            "apply_link": apply_link,
-            "source": job.publisher.strip() or "Company careers",
-            "posted_at": posted_at
-        })
-        job_id = res.inserted_id
-
-    # Check if already saved
-    existing_saved = db.saved_jobs.find_one({
-        "user_id": user_oid,
-        "job_id": job_id
-    })
-    
-    if existing_saved:
-        return str(existing_saved["_id"]), True
-
-    # Save job
-    res_saved = db.saved_jobs.insert_one({
-        "user_id": user_oid,
-        "job_id": job_id,
-        "saved_at": datetime.now()
-    })
-    return str(res_saved.inserted_id), False
-
-def create_session_response(user, message):
-    response = JSONResponse({"message": message, "user": public_user(user)})
-    token = auth_serializer.dumps({"user_id": user["id"]})
-    response.set_cookie(
-        key=SESSION_COOKIE_NAME,
-        value=token,
-        httponly=True,
-        secure=True,
-        max_age=SESSION_MAX_AGE_SECONDS,
-        samesite="none",
-    )
-    return response
-
-def get_current_user_from_request(request):
-    token = request.cookies.get(SESSION_COOKIE_NAME)
-    if not token:
-        return None
-    try:
-        payload = auth_serializer.loads(token, max_age=SESSION_MAX_AGE_SECONDS)
-        user_id = payload.get("user_id")
-        return fetch_user_by_id(user_id) if user_id else None
-    except (BadSignature, PyMongoError, RuntimeError):
-        return None
-
-def require_authenticated_user(request):
-    user = get_current_user_from_request(request)
-    if not user:
-        return None, JSONResponse({"error": "Please login or signup to continue."}, status_code=401)
-    return user, None
-
-
 def extract_text_from_pdf(pdf_file):
     """Extract text content from PDF file"""
     try:
@@ -685,96 +434,10 @@ def home():
         "status": "running",
         "endpoints": {
             "health_check": "/api/health",
-            "resume_analysis": "/api/resume/check (POST)",
-            "signup": "/api/signup (POST)",
-            "login": "/api/login (POST)",
-            "profile": "/api/profile (GET)",
-            "logout": "/api/logout (POST)"
+            "resume_analysis": "/api/resume/check (POST)"
         },
         "documentation": "Visit /api/health to check if Gemini API is configured"
     }
-
-@app.post('/api/signup')
-def signup(payload: SignupRequest, request: Request):
-    limited = rate_limit_response(request, "signup", limit=5, window_seconds=15 * 60)
-    if limited:
-        return limited
-
-    full_name = (payload.fullName or payload.name or "").strip()
-    email = payload.email.lower().strip()
-    password = payload.password
-
-    if not validate_full_name(full_name):
-        return JSONResponse({"error": "Enter a valid full name using letters, spaces, hyphens, or apostrophes."}, status_code=400)
-    if not validate_email(email):
-        return JSONResponse({"error": "Valid email is required."}, status_code=400)
-
-    is_valid_password, password_message = validate_password(password)
-    if not is_valid_password:
-        return JSONResponse({"error": password_message}, status_code=400)
-
-    try:
-        if fetch_user_by_email(email):
-            return JSONResponse({"error": "An account with this email already exists."}, status_code=409)
-
-        password_hash = generate_password_hash(password)
-        
-        user_id = str(ObjectId()) if ObjectId else secrets.token_hex(12)
-        user_doc = {
-            "_id": ObjectId(user_id) if ObjectId else user_id,
-            "full_name": full_name,
-            "email": email,
-            "password_hash": password_hash,
-            "auth_provider": "email",
-            "provider_id": None,
-            "profile_picture": None,
-            "created_at": datetime.now()
-        }
-        USERS_DB[user_id] = user_doc
-        USERS_EMAIL_MAP[email] = user_id
-        
-        user = fetch_user_by_id(user_id)
-        return create_session_response(user, "Signup successful")
-    except RuntimeError as exc:
-        logger.error(f"Signup configuration error: {str(exc)}", exc_info=True)
-        return JSONResponse({"error": str(exc)}, status_code=500)
-
-@app.post('/api/login')
-def login(payload: LoginRequest, request: Request):
-    limited = rate_limit_response(request, "login", limit=10, window_seconds=15 * 60)
-    if limited:
-        return limited
-
-    email = payload.email.lower().strip()
-    if not validate_email(email):
-        return JSONResponse({"error": "Valid email is required."}, status_code=400)
-    try:
-        user = fetch_user_by_email(email)
-    except RuntimeError as exc:
-        logger.error(f"Login configuration error: {str(exc)}", exc_info=True)
-        return JSONResponse({"error": str(exc)}, status_code=500)
-
-    if not user or user.get("auth_provider") != "email" or not user.get("password_hash"):
-        return JSONResponse({"error": "Invalid email or password."}, status_code=401)
-
-    if not check_password_hash(user["password_hash"], payload.password):
-        return JSONResponse({"error": "Invalid email or password."}, status_code=401)
-
-    return create_session_response(user, "Login successful")
-
-@app.get('/api/profile')
-def profile(request: Request):
-    limited = rate_limit_response(request, "profile", limit=90, window_seconds=60)
-    if limited:
-        return limited
-    user = get_current_user_from_request(request)
-    if not user:
-        return {"authenticated": False, "user": None}
-    try:
-        activity = fetch_profile_activity(user["id"])
-    except RuntimeError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=500)
-    return {"authenticated": True, "user": public_user(user), **activity}
 
 @app.get('/api/health')
 def health_check():
@@ -786,11 +449,7 @@ def health_check():
         "message": "API is configured and ready" if gemini_configured else "⚠️  Please set GEMINI_API_KEY environment variable",
         "endpoints": {
             "resume_check": "/api/resume/check",
-            "signup": "/api/signup",
-            "login": "/api/login",
-            "profile": "/api/profile",
-            "health": "/api/health",
-            "logout": "/api/logout"
+            "health": "/api/health"
         }
     }
 
@@ -801,9 +460,7 @@ async def check_resume(request: Request, resume: UploadFile = File(None), target
         limited = rate_limit_response(request, "resume_analysis", limit=5, window_seconds=60 * 60)
         if limited:
             return limited
-        user, auth_error = require_authenticated_user(request)
-        if auth_error:
-            return auth_error
+
 
         logger.info("📥 Processing /api/resume/check request")
         
@@ -843,7 +500,7 @@ async def check_resume(request: Request, resume: UploadFile = File(None), target
         resume_text = extract_text_from_pdf(io.BytesIO(uploaded_bytes))
         logger.info(f"✅ Extracted {len(resume_text)} characters")
         safe_filename = os.path.basename(resume_file.filename)[:255]
-        store_resume_record(user["id"], safe_filename, resume_text)
+
         
         # Extract sections
         logger.info("📋 Extracting resume sections...")
@@ -887,13 +544,6 @@ async def check_resume(request: Request, resume: UploadFile = File(None), target
         logger.error(f"❌ Error in /api/resume/check: {type(e).__name__}", exc_info=True)
         return JSONResponse({"error": "Failed to process resume. Please try again."}, status_code=500)
 
-@app.post('/api/logout')
-def logout():
-    logger.info("Processing /api/logout request")
-    response = JSONResponse({"message": "Logged out successfully"})
-    response.delete_cookie(SESSION_COOKIE_NAME, secure=True, samesite="none")
-    return response
-
 # Error handlers
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request, exc):
@@ -905,11 +555,7 @@ async def http_exception_handler(request, exc):
         "available_endpoints": {
             "root": "/ (GET)",
             "health": "/api/health (GET)",
-            "signup": "/api/signup (POST)",
-            "login": "/api/login (POST)",
-            "profile": "/api/profile (GET)",
-            "resume_check": "/api/resume/check (POST)",
-            "logout": "/api/logout (POST)"
+            "resume_check": "/api/resume/check (POST)"
         }
     }, status_code=404)
 
@@ -929,7 +575,6 @@ if __name__ == '__main__':
     logger.info("  - GET  /              : API information")
     logger.info("  - GET  /api/health    : Health check")
     logger.info("  - POST /api/resume/check : Resume analysis")
-    logger.info("  - POST /api/logout    : Logout")
     logger.info("=" * 60)
     
     if not GEMINI_API_KEY:

@@ -12,12 +12,6 @@ export const API_ENDPOINTS = {
   // Health Check
   HEALTH: `${API_BASE_URL}/api/health`,
   
-  // Logout
-  LOGOUT: `${API_BASE_URL}/api/logout`,
-  LOGIN: `${API_BASE_URL}/api/login`,
-  SIGNUP: `${API_BASE_URL}/api/signup`,
-  PROFILE: `${API_BASE_URL}/api/profile`,
-  
   // Root
   ROOT: `${API_BASE_URL}/`
 };
