@@ -9,9 +9,6 @@ export const API_ENDPOINTS = {
   // Resume Analysis
   RESUME_CHECK: `${API_BASE_URL}/api/resume/check`,
 
-  // Jobs
-  JOBS_INDIA: `${API_BASE_URL}/api/jobs/india`,
-  
   // Health Check
   HEALTH: `${API_BASE_URL}/api/health`,
   
@@ -20,7 +17,6 @@ export const API_ENDPOINTS = {
   LOGIN: `${API_BASE_URL}/api/login`,
   SIGNUP: `${API_BASE_URL}/api/signup`,
   PROFILE: `${API_BASE_URL}/api/profile`,
-  SAVED_JOBS: `${API_BASE_URL}/api/jobs/saved`,
   
   // Root
   ROOT: `${API_BASE_URL}/`

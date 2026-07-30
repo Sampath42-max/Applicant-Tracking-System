@@ -1,7 +1,6 @@
 import React, { Suspense, Component, useContext, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useParams, useLocation } from 'react-router-dom';
 import Build from './pages/Build.js';
-import Jobs from './pages/Jobs.js';
 import axios from 'axios';
 import ResumeChecker from './components/ResumeChecker.js';
 import LoadingPage from './components/LoadingPage.jsx';
@@ -279,7 +278,6 @@ const Header = () => {
   const navLinks = [
     { path: '/', label: 'Home' },
     { path: '/build', label: 'Build' },
-    { path: '/jobs', label: 'Jobs' },
     { path: '/resume-checker', label: 'Resume Checker' },
   ];
 
@@ -448,7 +446,6 @@ const App = () => {
         <Route path="/signup" element={<Signup />} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/build" element={<ProtectedRoute><Build /></ProtectedRoute>} />
-        <Route path="/jobs" element={<Jobs />} />
         <Route path="/resume-checker" element={<ProtectedRoute><ResumeChecker /></ProtectedRoute>} />
         <Route path="/results" element={<ProtectedRoute><ResultsPage /></ProtectedRoute>} />
         <Route path="/build/edit/:id" element={<ProtectedRoute><Edit /></ProtectedRoute>} />
@@ -472,7 +469,6 @@ const App = () => {
               <h3 className="font-semibold text-white mb-4">Product</h3>
               <ul className="space-y-2 text-sm">
                 <li><Link to="/build" className="transition-colors duration-200 hover:text-amber-400">Resume Builder</Link></li>
-                <li><Link to="/jobs" className="transition-colors duration-200 hover:text-amber-400">Jobs in India & US</Link></li>
                 <li><Link to="/resume-checker" className="transition-colors duration-200 hover:text-amber-400">Resume Checker</Link></li>
               </ul>
             </div>
